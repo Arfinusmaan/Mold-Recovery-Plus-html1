@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
   baSliders.forEach(slider => {
     const beforeWrap = slider.querySelector('.ba-image-before');
     const handle = slider.querySelector('.ba-handle');
-    let isDown = false;
+    let isDragging = false;
 
     if (!beforeWrap || !handle) return;
 
@@ -92,34 +92,74 @@ document.addEventListener('DOMContentLoaded', () => {
       beforeWrap.style.clipPath = `inset(0 ${100 - pos}% 0 0)`;
       beforeWrap.style.webkitClipPath = `inset(0 ${100 - pos}% 0 0)`;
       handle.style.left = `${pos}%`;
+      handle.setAttribute('aria-valuenow', Math.round(pos));
     }
 
-    function move(e) {
-      if (!isDown) return;
+    function getPositionFromEvent(e) {
       const rect = slider.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      if (clientX === undefined) return;
-      let pos = ((clientX - rect.left) / rect.width) * 100;
-      setPosition(pos);
+      const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX
+                    : (e.changedTouches && e.changedTouches.length > 0) ? e.changedTouches[0].clientX
+                    : e.clientX;
+      if (clientX === undefined) return null;
+      const pos = ((clientX - rect.left) / rect.width) * 100;
+      return Math.max(0, Math.min(100, pos));
     }
 
-    // Mouse events - allow clicking or dragging anywhere on container
-    slider.addEventListener('mousedown', (e) => {
-      isDown = true;
-      move(e);
+    function onPointerMove(e) {
+      if (!isDragging) return;
+      const pos = getPositionFromEvent(e);
+      if (pos !== null) {
+        setPosition(pos);
+      }
+    }
+
+    function onPointerDown(e) {
+      isDragging = true;
+      e.preventDefault();
+      try {
+        if (slider.setPointerCapture && e.pointerId) {
+          slider.setPointerCapture(e.pointerId);
+        }
+      } catch (err) {}
+      const pos = getPositionFromEvent(e);
+      if (pos !== null) {
+        setPosition(pos);
+      }
+    }
+
+    function onPointerUp(e) {
+      if (!isDragging) return;
+      isDragging = false;
+      try {
+        if (slider.releasePointerCapture && e.pointerId) {
+          slider.releasePointerCapture(e.pointerId);
+        }
+      } catch (err) {}
+    }
+
+    // Modern pointer events
+    slider.addEventListener('pointerdown', onPointerDown);
+    slider.addEventListener('pointermove', onPointerMove);
+    slider.addEventListener('pointerup', onPointerUp);
+    slider.addEventListener('pointercancel', onPointerUp);
+
+    // Fallbacks for older browsers / touch compatibility
+    window.addEventListener('mouseup', () => { isDragging = false; });
+    window.addEventListener('touchend', () => { isDragging = false; });
+
+    // Keyboard accessibility (Arrow keys when handle is focused)
+    handle.addEventListener('keydown', (e) => {
+      const current = parseFloat(handle.style.left) || 50;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setPosition(current - 5);
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setPosition(current + 5);
+      }
     });
-    window.addEventListener('mouseup', () => { isDown = false; });
-    window.addEventListener('mousemove', move);
 
-    // Touch events - smooth dragging on mobile
-    slider.addEventListener('touchstart', (e) => {
-      isDown = true;
-      move(e);
-    }, { passive: true });
-    window.addEventListener('touchend', () => { isDown = false; });
-    window.addEventListener('touchmove', move, { passive: true });
-
-    // Initial 50% center position
+    // Initial 50% position
     setPosition(50);
   });
 
