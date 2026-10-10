@@ -96,9 +96,54 @@ document.addEventListener('DOMContentLoaded', () => {
   baSliders.forEach(slider => {
     const beforeWrap = slider.querySelector('.ba-image-before');
     const handle = slider.querySelector('.ba-handle');
+    const badgeBefore = slider.querySelector('.ba-badge.before');
+    const badgeAfter = slider.querySelector('.ba-badge.after');
     let isDragging = false;
 
     if (!beforeWrap || !handle) return;
+
+    function updateBadgeVisibility(pos) {
+      // Pos: 0 (100% After revealed) to 100 (100% Before revealed).
+      // Sliding RIGHT (pos increasing): Before image expands, After image shrinks.
+      // The After label on the right should smoothly fade out as handle approaches the right,
+      // and become completely invisible when pos >= 88.
+      if (badgeAfter) {
+        if (pos >= 88) {
+          badgeAfter.style.opacity = '0';
+          badgeAfter.style.visibility = 'hidden';
+          badgeAfter.style.pointerEvents = 'none';
+        } else if (pos > 68) {
+          const op = (88 - pos) / 20;
+          badgeAfter.style.opacity = op.toFixed(2);
+          badgeAfter.style.visibility = 'visible';
+          badgeAfter.style.pointerEvents = 'none';
+        } else {
+          badgeAfter.style.opacity = '1';
+          badgeAfter.style.visibility = 'visible';
+          badgeAfter.style.pointerEvents = 'none';
+        }
+      }
+
+      // Sliding LEFT (pos decreasing): After image expands, Before image shrinks.
+      // The Before label on the left should smoothly fade out as handle approaches the left,
+      // and become completely invisible when pos <= 12.
+      if (badgeBefore) {
+        if (pos <= 12) {
+          badgeBefore.style.opacity = '0';
+          badgeBefore.style.visibility = 'hidden';
+          badgeBefore.style.pointerEvents = 'none';
+        } else if (pos < 32) {
+          const op = (pos - 12) / 20;
+          badgeBefore.style.opacity = op.toFixed(2);
+          badgeBefore.style.visibility = 'visible';
+          badgeBefore.style.pointerEvents = 'none';
+        } else {
+          badgeBefore.style.opacity = '1';
+          badgeBefore.style.visibility = 'visible';
+          badgeBefore.style.pointerEvents = 'none';
+        }
+      }
+    }
 
     function setPosition(pos) {
       if (pos < 0) pos = 0;
@@ -107,7 +152,11 @@ document.addEventListener('DOMContentLoaded', () => {
       beforeWrap.style.webkitClipPath = `inset(0 ${100 - pos}% 0 0)`;
       handle.style.left = `${pos}%`;
       handle.setAttribute('aria-valuenow', Math.round(pos));
+      updateBadgeVisibility(pos);
     }
+
+    // Initialize at center
+    setPosition(50);
 
     function getPositionFromEvent(e) {
       const rect = slider.getBoundingClientRect();
@@ -157,11 +206,39 @@ document.addEventListener('DOMContentLoaded', () => {
     slider.addEventListener('pointerup', onPointerUp);
     slider.addEventListener('pointercancel', onPointerUp);
 
-    // Fallbacks for older browsers / touch compatibility
-    window.addEventListener('mouseup', () => { isDragging = false; });
-    window.addEventListener('touchend', () => { isDragging = false; });
+    // Click to jump
+    slider.addEventListener('click', (e) => {
+      const pos = getPositionFromEvent(e);
+      if (pos !== null) setPosition(pos);
+    });
 
-    // Keyboard accessibility (Arrow keys when handle is focused)
+    // Touch events for mobile compatibility
+    slider.addEventListener('touchstart', (e) => {
+      isDragging = true;
+      const pos = getPositionFromEvent(e);
+      if (pos !== null) setPosition(pos);
+    }, { passive: true });
+    slider.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      const pos = getPositionFromEvent(e);
+      if (pos !== null) setPosition(pos);
+    }, { passive: true });
+    slider.addEventListener('touchend', () => { isDragging = false; });
+
+    // Mouse drag fallbacks
+    slider.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      const pos = getPositionFromEvent(e);
+      if (pos !== null) setPosition(pos);
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const pos = getPositionFromEvent(e);
+      if (pos !== null) setPosition(pos);
+    });
+    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    // Keyboard accessibility (Arrow keys, Home, End when handle is focused)
     handle.addEventListener('keydown', (e) => {
       const current = parseFloat(handle.style.left) || 50;
       if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
@@ -170,6 +247,12 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
         e.preventDefault();
         setPosition(current + 5);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        setPosition(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        setPosition(100);
       }
     });
 
