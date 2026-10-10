@@ -38,6 +38,20 @@ document.addEventListener('DOMContentLoaded', () => {
   if (drawerClose) drawerClose.addEventListener('click', closeDrawer);
   if (drawerOverlay) drawerOverlay.addEventListener('click', closeDrawer);
 
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && mobileDrawer && mobileDrawer.classList.contains('open')) {
+      closeDrawer();
+    }
+  });
+
+  // Close drawer on clicking regular drawer links
+  const drawerNavLinks = document.querySelectorAll('.mobile-nav-link:not(.mobile-submenu-toggle), .mobile-submenu a, .mobile-drawer-cta a');
+  drawerNavLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      closeDrawer();
+    });
+  });
+
   // Mobile submenu toggles
   const mobileSubmenuToggles = document.querySelectorAll('.mobile-submenu-toggle');
   mobileSubmenuToggles.forEach(toggle => {
